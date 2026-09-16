@@ -19,12 +19,12 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {% for p in productos %}
         <div class="card p-4 flex flex-col">
-            <div class="flex justify-between items-start mb-2">
-                <h3 class="font-semibold text-sm leading-tight">{{ p.nombre }}</h3>
+            <div class="flex justify-between items-start gap-2 mb-2">
+                <h3 class="font-semibold text-sm leading-tight flex-1 min-w-0 pr-1">{{ p.nombre }}</h3>
                 {% if p.stock <= p.stock_minimo %}
-                <span class="badge badge-red">{{ p.stock }} uds</span>
+                <span class="badge badge-red shrink-0 whitespace-nowrap">{{ p.stock }} uds</span>
                 {% else %}
-                <span class="badge badge-green">{{ p.stock }} uds</span>
+                <span class="badge badge-green shrink-0 whitespace-nowrap">{{ p.stock }} uds</span>
                 {% endif %}
             </div>
             {% if p.codigo %}<p class="text-xs text-gray-500 mb-1">Cód: {{ p.codigo }}</p>{% endif %}
