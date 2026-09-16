@@ -3,8 +3,15 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 DB_PATH = Path(__file__).parent.parent / "data" / "inventario.db"
 DATABASE_URL = os.environ.get("DATABASE_URL") or os.environ.get("SUPABASE_DB_URL")
+
 
 
 def is_postgres() -> bool:
