@@ -18,7 +18,7 @@ def set_tasa_local(tasa: float) -> float:
     tasa = round(tasa, 2)
     with get_db() as conn:
         conn.execute(
-            "UPDATE configuracion SET valor = ?, updated_at = datetime('now', 'localtime') WHERE clave = 'tasa_cambio'",
+            "UPDATE configuracion SET valor = ?, updated_at = CURRENT_TIMESTAMP WHERE clave = 'tasa_cambio'",
             (str(tasa),),
         )
     return tasa

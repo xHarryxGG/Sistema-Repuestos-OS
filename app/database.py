@@ -1,5 +1,6 @@
 import os
 import sqlite3
+from datetime import datetime, date
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -19,6 +20,16 @@ def get_database_url() -> str:
 def is_postgres() -> bool:
     url = get_database_url()
     return "postgres://" in url or "postgresql://" in url
+
+
+def _format_pg_row(row):
+    if not row:
+        return row
+    d = dict(row)
+    for k, v in d.items():
+        if isinstance(v, (datetime, date)):
+            d[k] = v.strftime("%Y-%m-%d %H:%M:%S") if isinstance(v, datetime) else v.strftime("%Y-%m-%d")
+    return d
 
 
 class PostgresCursorWrapper:
@@ -46,10 +57,12 @@ class PostgresCursorWrapper:
         return self
 
     def fetchone(self):
-        return self._cursor.fetchone()
+        row = self._cursor.fetchone()
+        return _format_pg_row(row)
 
     def fetchall(self):
-        return self._cursor.fetchall()
+        rows = self._cursor.fetchall()
+        return [_format_pg_row(r) for r in rows] if rows else []
 
 
 class PostgresConnectionWrapper:

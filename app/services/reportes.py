@@ -166,14 +166,19 @@ def ventas_por_dia(fecha_inicio: str, fecha_fin: str) -> list:
 def anios_disponibles() -> list[int]:
     now = datetime.now().year
     with get_db() as conn:
-        rows = conn.execute(
-            """
-            SELECT DISTINCT CAST(strftime('%Y', fecha) AS INTEGER) as anio
-            FROM ventas ORDER BY anio DESC
-            """
-        ).fetchall()
-    anios_db = {r["anio"] for r in rows if r["anio"]}
-    # Rango amplio para poder seleccionar cualquier año
+        try:
+            from app.database import is_postgres
+            if is_postgres():
+                rows = conn.execute(
+                    "SELECT DISTINCT EXTRACT(YEAR FROM fecha)::INTEGER as anio FROM ventas ORDER BY anio DESC"
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT DISTINCT CAST(strftime('%Y', fecha) AS INTEGER) as anio FROM ventas ORDER BY anio DESC"
+                ).fetchall()
+            anios_db = {r["anio"] for r in rows if r and r.get("anio")}
+        except Exception:
+            anios_db = set()
     anios_rango = set(range(now - 10, now + 2))
     return sorted(anios_db | anios_rango, reverse=True)
 
