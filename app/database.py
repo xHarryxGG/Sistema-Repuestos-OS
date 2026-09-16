@@ -23,6 +23,9 @@ def is_postgres() -> bool:
     return "postgres://" in url or "postgresql://" in url or "postgres:" in url or "postgresql:" in url
 
 
+from decimal import Decimal
+
+
 def _format_pg_row(row):
     if not row:
         return row
@@ -30,7 +33,10 @@ def _format_pg_row(row):
     for k, v in d.items():
         if isinstance(v, (datetime, date)):
             d[k] = v.strftime("%Y-%m-%d %H:%M:%S") if isinstance(v, datetime) else v.strftime("%Y-%m-%d")
+        elif isinstance(v, Decimal):
+            d[k] = float(v)
     return d
+
 
 
 class PostgresCursorWrapper:
