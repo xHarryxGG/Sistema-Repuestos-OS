@@ -47,6 +47,7 @@ async def nuevo_producto(request: Request):
 
 @router.post("/nuevo")
 async def crear_producto(
+    request: Request,
     nombre: str = Form(...),
     codigo: str = Form(""),
     descripcion: str = Form(""),
@@ -56,13 +57,56 @@ async def crear_producto(
     stock: int = Form(0),
     stock_minimo: int = Form(5),
 ):
-    with get_db() as conn:
-        conn.execute(
-            """INSERT INTO productos (nombre, codigo, descripcion, categoria, precio_usd, costo_usd, stock, stock_minimo)
-               VALUES (?,?,?,?,?,?,?,?)""",
-            (nombre, codigo or None, descripcion, categoria, precio_usd, costo_usd, stock, stock_minimo),
-        )
-    return RedirectResponse("/productos", status_code=303)
+    codigo_clean = codigo.strip() if codigo and codigo.strip() else None
+    if codigo_clean:
+        with get_db() as conn:
+            existente = conn.execute(
+                "SELECT id, nombre FROM productos WHERE LOWER(codigo) = LOWER(?)",
+                (codigo_clean,),
+            ).fetchone()
+            if existente:
+                ctx = template_context(request)
+                ctx.update({
+                    "active": "productos",
+                    "error": f"El código '{codigo_clean}' ya pertenece al producto '{existente['nombre']}'.",
+                    "producto": {
+                        "nombre": nombre,
+                        "codigo": codigo,
+                        "descripcion": descripcion,
+                        "categoria": categoria,
+                        "precio_usd": precio_usd,
+                        "costo_usd": costo_usd,
+                        "stock": stock,
+                        "stock_minimo": stock_minimo,
+                    },
+                })
+                return templates.TemplateResponse("productos/form.html", ctx, status_code=400)
+
+    try:
+        with get_db() as conn:
+            conn.execute(
+                """INSERT INTO productos (nombre, codigo, descripcion, categoria, precio_usd, costo_usd, stock, stock_minimo)
+                   VALUES (?,?,?,?,?,?,?,?)""",
+                (nombre, codigo_clean, descripcion, categoria, precio_usd, costo_usd, stock, stock_minimo),
+            )
+        return RedirectResponse("/productos", status_code=303)
+    except Exception as e:
+        ctx = template_context(request)
+        ctx.update({
+            "active": "productos",
+            "error": "El código ingresado ya existe o ocurrió un error al guardar.",
+            "producto": {
+                "nombre": nombre,
+                "codigo": codigo,
+                "descripcion": descripcion,
+                "categoria": categoria,
+                "precio_usd": precio_usd,
+                "costo_usd": costo_usd,
+                "stock": stock,
+                "stock_minimo": stock_minimo,
+            },
+        })
+        return templates.TemplateResponse("productos/form.html", ctx, status_code=400)
 
 
 @router.get("/{producto_id}/editar", response_class=HTMLResponse)
@@ -78,6 +122,7 @@ async def editar_producto(request: Request, producto_id: int):
 
 @router.post("/{producto_id}/editar")
 async def actualizar_producto(
+    request: Request,
     producto_id: int,
     nombre: str = Form(...),
     codigo: str = Form(""),
@@ -88,21 +133,66 @@ async def actualizar_producto(
     stock: int = Form(0),
     stock_minimo: int = Form(5),
 ):
-    with get_db() as conn:
-        anterior = conn.execute("SELECT * FROM productos WHERE id=?", (producto_id,)).fetchone()
-        conn.execute(
-            """UPDATE productos SET nombre=?, codigo=?, descripcion=?, categoria=?,
-               precio_usd=?, costo_usd=?, stock=?, stock_minimo=? WHERE id=?""",
-            (nombre, codigo or None, descripcion, categoria, precio_usd, costo_usd, stock, stock_minimo, producto_id),
-        )
-        nuevo = conn.execute("SELECT * FROM productos WHERE id=?", (producto_id,)).fetchone()
-        registrar_movimiento(
-            conn, "producto", producto_id, "editar",
-            f"Producto '{nombre}' editado",
-            datos_anteriores=dict(anterior) if anterior else None,
-            datos_nuevos=dict(nuevo) if nuevo else None,
-        )
-    return RedirectResponse("/productos", status_code=303)
+    codigo_clean = codigo.strip() if codigo and codigo.strip() else None
+    if codigo_clean:
+        with get_db() as conn:
+            existente = conn.execute(
+                "SELECT id, nombre FROM productos WHERE LOWER(codigo) = LOWER(?) AND id != ?",
+                (codigo_clean, producto_id),
+            ).fetchone()
+            if existente:
+                ctx = template_context(request)
+                ctx.update({
+                    "active": "productos",
+                    "error": f"El código '{codigo_clean}' ya pertenece al producto '{existente['nombre']}'.",
+                    "producto": {
+                        "id": producto_id,
+                        "nombre": nombre,
+                        "codigo": codigo,
+                        "descripcion": descripcion,
+                        "categoria": categoria,
+                        "precio_usd": precio_usd,
+                        "costo_usd": costo_usd,
+                        "stock": stock,
+                        "stock_minimo": stock_minimo,
+                    },
+                })
+                return templates.TemplateResponse("productos/form.html", ctx, status_code=400)
+
+    try:
+        with get_db() as conn:
+            anterior = conn.execute("SELECT * FROM productos WHERE id=?", (producto_id,)).fetchone()
+            conn.execute(
+                """UPDATE productos SET nombre=?, codigo=?, descripcion=?, categoria=?,
+                   precio_usd=?, costo_usd=?, stock=?, stock_minimo=? WHERE id=?""",
+                (nombre, codigo_clean, descripcion, categoria, precio_usd, costo_usd, stock, stock_minimo, producto_id),
+            )
+            nuevo = conn.execute("SELECT * FROM productos WHERE id=?", (producto_id,)).fetchone()
+            registrar_movimiento(
+                conn, "producto", producto_id, "editar",
+                f"Producto '{nombre}' editado",
+                datos_anteriores=dict(anterior) if anterior else None,
+                datos_nuevos=dict(nuevo) if nuevo else None,
+            )
+        return RedirectResponse("/productos", status_code=303)
+    except Exception as e:
+        ctx = template_context(request)
+        ctx.update({
+            "active": "productos",
+            "error": "No se pudo actualizar el producto. Verifique que el código no esté duplicado.",
+            "producto": {
+                "id": producto_id,
+                "nombre": nombre,
+                "codigo": codigo,
+                "descripcion": descripcion,
+                "categoria": categoria,
+                "precio_usd": precio_usd,
+                "costo_usd": costo_usd,
+                "stock": stock,
+                "stock_minimo": stock_minimo,
+            },
+        })
+        return templates.TemplateResponse("productos/form.html", ctx, status_code=400)
 
 
 @router.post("/{producto_id}/eliminar")
