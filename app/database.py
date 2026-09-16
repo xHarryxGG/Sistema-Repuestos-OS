@@ -14,12 +14,13 @@ DB_PATH = Path(__file__).parent.parent / "data" / "inventario.db"
 
 
 def get_database_url() -> str:
-    return os.environ.get("DATABASE_URL") or os.environ.get("SUPABASE_DB_URL") or ""
+    url = os.environ.get("DATABASE_URL") or os.environ.get("SUPABASE_DB_URL") or os.environ.get("POSTGRES_URL") or ""
+    return url.strip().strip("'").strip('"')
 
 
 def is_postgres() -> bool:
-    url = get_database_url()
-    return "postgres://" in url or "postgresql://" in url
+    url = get_database_url().lower()
+    return "postgres://" in url or "postgresql://" in url or "postgres:" in url or "postgresql:" in url
 
 
 def _format_pg_row(row):
@@ -94,7 +95,7 @@ class PostgresConnectionWrapper:
 
 def get_connection():
     db_url = get_database_url()
-    if db_url and ("postgres://" in db_url or "postgresql://" in db_url):
+    if is_postgres():
         import psycopg2
         url = db_url
         if url.startswith("postgres://"):
@@ -107,11 +108,17 @@ def get_connection():
             conn = psycopg2.connect(url)
         return PostgresConnectionWrapper(conn)
     else:
-        try:
-            DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        except Exception:
-            pass
-        conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+        # Si está en Vercel (servidor de solo lectura), usar /tmp para SQLite si no hay DATABASE_URL
+        if os.environ.get("VERCEL"):
+            tmp_db = Path("/tmp") / "inventario.db"
+            conn = sqlite3.connect(str(tmp_db), check_same_thread=False)
+        else:
+            try:
+                DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                pass
+            conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+
         conn.row_factory = sqlite3.Row
         try:
             conn.execute("PRAGMA foreign_keys = ON")
