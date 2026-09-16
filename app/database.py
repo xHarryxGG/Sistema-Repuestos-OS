@@ -40,15 +40,16 @@ class PostgresCursorWrapper:
 
     def execute(self, query: str, params: tuple | list = ()):
         pg_query = query.replace("?", "%s")
-        is_insert = pg_query.strip().upper().startswith("INSERT INTO")
-        has_returning = "RETURNING" in pg_query.upper()
+        upper_q = pg_query.strip().upper()
+        is_insert = upper_q.startswith("INSERT INTO")
+        has_returning = "RETURNING" in upper_q
 
-        if is_insert and not has_returning:
+        if is_insert and not has_returning and "ON CONFLICT" not in upper_q and "INTO CONFIGURACION" not in upper_q:
             pg_query = pg_query.rstrip("; ") + " RETURNING id;"
 
         self._cursor.execute(pg_query, params or ())
 
-        if is_insert:
+        if is_insert and "RETURNING" in pg_query.upper():
             try:
                 row = self._cursor.fetchone()
                 if row and "id" in row:
@@ -101,14 +102,21 @@ def get_connection():
         if url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql://", 1)
         
-        # Conexión a Supabase / PostgreSQL con SSL obligatorio para Vercel
-        if "sslmode" not in url.lower():
-            conn = psycopg2.connect(url, sslmode="require")
-        else:
-            conn = psycopg2.connect(url)
-        return PostgresConnectionWrapper(conn)
+        try:
+            if "sslmode" not in url.lower():
+                conn = psycopg2.connect(url, sslmode="require", connect_timeout=10)
+            else:
+                conn = psycopg2.connect(url, connect_timeout=10)
+            return PostgresConnectionWrapper(conn)
+        except Exception as e:
+            print("PostgreSQL Connection Error:", e)
+            if os.environ.get("VERCEL"):
+                tmp_db = Path("/tmp") / "inventario.db"
+                conn = sqlite3.connect(str(tmp_db), check_same_thread=False)
+                conn.row_factory = sqlite3.Row
+                return conn
+            raise e
     else:
-        # Si está en Vercel (servidor de solo lectura), usar /tmp para SQLite si no hay DATABASE_URL
         if os.environ.get("VERCEL"):
             tmp_db = Path("/tmp") / "inventario.db"
             conn = sqlite3.connect(str(tmp_db), check_same_thread=False)
@@ -142,7 +150,113 @@ def get_db():
 
 def init_db():
     if is_postgres():
-        # En Supabase PostgreSQL la estructura la genera el script SQL
+        try:
+            sql_statements = [
+                """CREATE TABLE IF NOT EXISTS clientes (
+                    id SERIAL PRIMARY KEY,
+                    nombre VARCHAR(255) NOT NULL,
+                    cedula VARCHAR(50),
+                    telefono VARCHAR(50),
+                    email VARCHAR(255),
+                    direccion TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                )""",
+                """CREATE TABLE IF NOT EXISTS productos (
+                    id SERIAL PRIMARY KEY,
+                    codigo VARCHAR(100) UNIQUE,
+                    nombre VARCHAR(255) NOT NULL,
+                    descripcion TEXT,
+                    categoria VARCHAR(100),
+                    precio_usd NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                    costo_usd NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                    stock INT NOT NULL DEFAULT 0,
+                    stock_minimo INT DEFAULT 5,
+                    activo INT DEFAULT 1,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                )""",
+                """CREATE TABLE IF NOT EXISTS ventas (
+                    id SERIAL PRIMARY KEY,
+                    cliente_id INT REFERENCES clientes(id) ON DELETE SET NULL,
+                    total_usd NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                    total_bs NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                    subtotal_usd NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                    iva_usd NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                    subtotal_bs NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                    iva_bs NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                    tasa_cambio NUMERIC(12, 2) NOT NULL DEFAULT 1,
+                    notas TEXT,
+                    fecha TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    cerrada INT DEFAULT 0
+                )""",
+                """CREATE TABLE IF NOT EXISTS venta_detalles (
+                    id SERIAL PRIMARY KEY,
+                    venta_id INT NOT NULL REFERENCES ventas(id) ON DELETE CASCADE,
+                    producto_id INT NOT NULL REFERENCES productos(id),
+                    cantidad INT NOT NULL,
+                    precio_unitario_usd NUMERIC(12, 2) NOT NULL,
+                    subtotal_usd NUMERIC(12, 2) NOT NULL
+                )""",
+                """CREATE TABLE IF NOT EXISTS venta_pagos (
+                    id SERIAL PRIMARY KEY,
+                    venta_id INT NOT NULL REFERENCES ventas(id) ON DELETE CASCADE,
+                    metodo_pago VARCHAR(50) NOT NULL,
+                    monto_usd NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                    monto_bs NUMERIC(12, 2) NOT NULL DEFAULT 0
+                )""",
+                """CREATE TABLE IF NOT EXISTS compras (
+                    id SERIAL PRIMARY KEY,
+                    proveedor VARCHAR(255),
+                    total_usd NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                    notas TEXT,
+                    fecha TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                )""",
+                """CREATE TABLE IF NOT EXISTS compra_detalles (
+                    id SERIAL PRIMARY KEY,
+                    compra_id INT NOT NULL REFERENCES compras(id) ON DELETE CASCADE,
+                    producto_id INT NOT NULL REFERENCES productos(id),
+                    cantidad INT NOT NULL,
+                    precio_unitario_usd NUMERIC(12, 2) NOT NULL,
+                    subtotal_usd NUMERIC(12, 2) NOT NULL
+                )""",
+                """CREATE TABLE IF NOT EXISTS cierres_diarios (
+                    id SERIAL PRIMARY KEY,
+                    fecha DATE NOT NULL UNIQUE,
+                    total_ventas_usd NUMERIC(12, 2) DEFAULT 0,
+                    total_ventas_bs NUMERIC(12, 2) DEFAULT 0,
+                    total_efectivo_usd NUMERIC(12, 2) DEFAULT 0,
+                    total_pago_movil_bs NUMERIC(12, 2) DEFAULT 0,
+                    total_punto_bs NUMERIC(12, 2) DEFAULT 0,
+                    total_divisas_usd NUMERIC(12, 2) DEFAULT 0,
+                    num_ventas INT DEFAULT 0,
+                    notas TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                )""",
+                """CREATE TABLE IF NOT EXISTS configuracion (
+                    clave VARCHAR(100) PRIMARY KEY,
+                    valor TEXT NOT NULL,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                )""",
+                "INSERT INTO configuracion (clave, valor) VALUES ('tasa_cambio', '36.50') ON CONFLICT (clave) DO NOTHING",
+                "INSERT INTO configuracion (clave, valor) VALUES ('nombre_negocio', 'Mi Negocio') ON CONFLICT (clave) DO NOTHING",
+                """CREATE TABLE IF NOT EXISTS movimientos (
+                    id SERIAL PRIMARY KEY,
+                    entidad VARCHAR(50) NOT NULL,
+                    entidad_id INT NOT NULL,
+                    accion VARCHAR(50) NOT NULL,
+                    descripcion TEXT NOT NULL,
+                    datos_anteriores TEXT,
+                    datos_nuevos TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                )"""
+            ]
+            for stmt in sql_statements:
+                try:
+                    with get_db() as conn:
+                        conn.execute(stmt)
+                except Exception as stmt_err:
+                    print("PG init stmt error:", stmt_err)
+        except Exception as e:
+            print(f"Warning: PostgreSQL init_db error: {e}")
         return
 
     try:
@@ -256,7 +370,6 @@ def init_db():
                 );
             """)
 
-            # Migraciones seguras para bases de datos existentes en SQLite
             for col in ["subtotal_usd", "iva_usd", "subtotal_bs", "iva_bs"]:
                 try:
                     conn.execute(f"ALTER TABLE ventas ADD COLUMN {col} REAL DEFAULT 0")
