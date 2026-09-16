@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block page_title %}Venta #{{ venta.id }}{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto animate-fade-in">
+    <div class="card p-6">
+        <div class="flex justify-between items-start mb-6">
+            <div>
+                <h2 class="text-xl font-bold">Venta #{{ venta.id }}</h2>
+                <p class="text-sm text-gray-500">{{ venta.fecha }}</p>
+            </div>
+            <div class="flex gap-2">
+                <a href="/ventas" class="btn-secondary text-sm">← Volver</a>
+                <form method="post" action="/ventas/{{ venta.id }}/eliminar"
+                      onsubmit="return confirm('¿Eliminar esta venta? Los productos volverán al stock.')">
+                    <button type="submit" class="btn-danger text-sm">Eliminar</button>
+                </form>
+            </div>
+        </div>
+
+        {% if venta.cliente_nombre %}
+        <div class="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <p class="text-sm"><span class="text-gray-500">Cliente:</span> <strong>{{ venta.cliente_nombre }}</strong></p>
+            {% if venta.cliente_telefono %}<p class="text-sm text-gray-500">{{ venta.cliente_telefono }}</p>{% endif %}
+        </div>
+        {% endif %}
+
+        <div class="table-container mb-4">
+            <table class="data-table">
+                <thead><tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr></thead>
+                <tbody>
+                {% for d in detalles %}
+                <tr>
+                    <td>{{ d.producto_nombre }}{% if d.codigo %} <span class="text-gray-400 text-xs">({{ d.codigo }})</span>{% endif %}</td>
+                    <td>{{ d.cantidad }}</td>
+                    <td>${{ "%.2f"|format(d.precio_unitario_usd) }}</td>
+                    <td class="font-semibold">${{ "%.2f"|format(d.subtotal_usd) }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
+            <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                <span>Monto sin IVA (Bs)</span><span>Bs. {{ "%.2f"|format(venta.subtotal_bs) }}</span>
+            </div>
+            <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                <span>IVA (16%) (Bs)</span><span>Bs. {{ "%.2f"|format(venta.iva_bs) }}</span>
+            </div>
+            <div class="flex justify-between text-lg font-bold">
+                <span>Total con IVA (Bs)</span><span class="text-brand-600">Bs. {{ "%.2f"|format(venta.total_bs) }}</span>
+            </div>
+            <div class="flex justify-between text-sm font-medium border-t border-dashed border-gray-200 dark:border-gray-700 pt-2">
+                <span>Total USD ($)</span><span>${{ "%.2f"|format(venta.total_usd) }} <span class="text-xs text-gray-500 font-normal">(Sin IVA: ${{ "%.2f"|format(venta.subtotal_usd) }} + IVA: ${{ "%.2f"|format(venta.iva_usd) }})</span></span>
+            </div>
+            <div class="flex justify-between text-xs text-gray-400 pt-1">
+                <span>Tasa aplicada</span><span>{{ "%.2f"|format(venta.tasa_cambio) }} Bs/$</span>
+            </div>
+        </div>
+
+        <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <p class="text-sm font-medium mb-2">Pagos</p>
+            {% for p in pagos %}
+            <div class="flex justify-between text-sm">
+                <span>{{ metodos_pago.get(p.metodo_pago, p.metodo_pago) }}</span>
+                <span>
+                    {% if p.monto_usd > 0 %}${{ "%.2f"|format(p.monto_usd) }}{% endif %}
+                    {% if p.monto_bs > 0 %}Bs. {{ "%.2f"|format(p.monto_bs) }}{% endif %}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if venta.notas %}
+        <div class="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-sm">
+            <span class="text-gray-500">Notas:</span> {{ venta.notas }}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

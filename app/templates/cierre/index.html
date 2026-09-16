@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block page_title %}Cierre Diario{% endblock %}
+{% block content %}
+<div class="space-y-6 animate-fade-in">
+    <div class="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
+        <form method="get" class="flex gap-2">
+            <input type="date" name="fecha" value="{{ fecha }}" class="input-field">
+            <button type="submit" class="btn-secondary">Consultar</button>
+        </form>
+        {% if not cierre and resumen.num_ventas > 0 %}
+        <form method="post" action="/cierre/cerrar">
+            <input type="hidden" name="fecha" value="{{ fecha }}">
+            <button type="submit" class="btn-primary" onclick="return confirm('¿Confirmar cierre del día {{ fecha }}?')">
+                Cerrar Día
+            </button>
+        </form>
+        {% elif cierre %}
+        <span class="badge badge-green text-sm px-3 py-1">Día cerrado</span>
+        {% endif %}
+    </div>
+
+    <!-- Summary cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="stat-card">
+            <p class="text-sm text-gray-500">Ventas del Día</p>
+            <p class="text-2xl font-bold">{{ resumen.num_ventas }}</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-sm text-gray-500">Total USD</p>
+            <p class="text-2xl font-bold text-brand-600">${{ "%.2f"|format(resumen.total_usd) }}</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-sm text-gray-500">Total Bs</p>
+            <p class="text-2xl font-bold">Bs. {{ "%.2f"|format(resumen.total_bs) }}</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-sm text-gray-500">Estado</p>
+            <p class="text-lg font-bold {{ 'text-green-600' if cierre else 'text-yellow-600' }}">
+                {{ 'Cerrado' if cierre else 'Abierto' }}
+            </p>
+        </div>
+    </div>
+
+    <!-- Payment breakdown -->
+    {% if pagos %}
+    <div class="card p-5">
+        <h3 class="font-semibold mb-4">Desglose por Método de Pago</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {% for p in pagos %}
+            <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <p class="text-sm text-gray-500">{{ metodos_pago.get(p.metodo_pago, p.metodo_pago) }}</p>
+                {% if p.total_usd > 0 %}<p class="font-bold">${{ "%.2f"|format(p.total_usd) }}</p>{% endif %}
+                {% if p.total_bs > 0 %}<p class="font-bold">Bs. {{ "%.2f"|format(p.total_bs) }}</p>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Sales of the day -->
+    <div class="card p-5">
+        <h3 class="font-semibold mb-4">Ventas del {{ fecha }}</h3>
+        <div class="table-container">
+            <table class="data-table">
+                <thead><tr><th>#</th><th>Hora</th><th>Cliente</th><th>USD</th><th>Bs</th><th></th></tr></thead>
+                <tbody>
+                {% for v in ventas %}
+                <tr>
+                    <td>#{{ v.id }}</td>
+                    <td>{{ v.fecha[11:16] if v.fecha|length > 10 else v.fecha }}</td>
+                    <td>{{ v.cliente_nombre or '—' }}</td>
+                    <td>${{ "%.2f"|format(v.total_usd) }}</td>
+                    <td>Bs. {{ "%.2f"|format(v.total_bs) }}</td>
+                    <td><a href="/ventas/{{ v.id }}" class="text-brand-600 text-sm hover:underline">Ver</a></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-gray-500 py-6">Sin ventas este día</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- History -->
+    {% if historial %}
+    <div class="card p-5">
+        <h3 class="font-semibold mb-4">Historial de Cierres</h3>
+        <div class="table-container">
+            <table class="data-table">
+                <thead><tr><th>Fecha</th><th>Ventas</th><th>Total USD</th><th>Total Bs</th><th></th></tr></thead>
+                <tbody>
+                {% for h in historial %}
+                <tr>
+                    <td>{{ h.fecha }}</td>
+                    <td>{{ h.num_ventas }}</td>
+                    <td>${{ "%.2f"|format(h.total_ventas_usd) }}</td>
+                    <td>Bs. {{ "%.2f"|format(h.total_ventas_bs) }}</td>
+                    <td><a href="/cierre?fecha={{ h.fecha }}" class="text-brand-600 text-sm hover:underline">Ver</a></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block page_title %}Dashboard{% endblock %}
+{% block content %}
+<div class="space-y-6 animate-fade-in">
+    <!-- Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div class="stat-card">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Ventas Hoy</p>
+            <p class="text-2xl font-bold mt-1">{{ resumen.ventas_hoy.n }}</p>
+            <p class="text-sm text-brand-600 dark:text-brand-400 mt-1">${{ "%.2f"|format(resumen.ventas_hoy.t) }}</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Ganancia del Mes</p>
+            <p class="text-2xl font-bold mt-1 text-green-600 dark:text-green-400">${{ "%.2f"|format(resumen.ganancia_mes.ganancia_usd) }}</p>
+            <p class="text-sm text-gray-500 mt-1">Margen: {{ resumen.ganancia_mes.margen }}%</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Productos Activos</p>
+            <p class="text-2xl font-bold mt-1">{{ resumen.total_productos }}</p>
+            {% if resumen.bajo_stock > 0 %}
+            <p class="text-sm text-red-500 mt-1">{{ resumen.bajo_stock }} con stock bajo</p>
+            {% else %}
+            <p class="text-sm text-green-500 mt-1">Stock OK</p>
+            {% endif %}
+        </div>
+        <div class="stat-card">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Clientes</p>
+            <p class="text-2xl font-bold mt-1">{{ resumen.total_clientes }}</p>
+            <a href="/clientes/nuevo" class="text-sm text-brand-600 dark:text-brand-400 mt-1 inline-block hover:underline">+ Agregar cliente</a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Quick actions -->
+        <div class="card p-5 lg:col-span-1">
+            <h2 class="font-semibold mb-4">Acciones Rápidas</h2>
+            <div class="space-y-2">
+                <a href="/ventas/registrar" class="btn-primary w-full">Registrar Venta</a>
+                <a href="/productos/nuevo" class="btn-secondary w-full">Nuevo Producto</a>
+                <a href="/compras/registrar" class="btn-secondary w-full">Registrar Compra</a>
+                <a href="/cierre" class="btn-secondary w-full">Cierre Diario</a>
+            </div>
+        </div>
+
+        <!-- Sales chart -->
+        <div class="card p-5 lg:col-span-2">
+            <h2 class="font-semibold mb-4">Ventas Últimos 14 Días</h2>
+            {% if ventas_chart %}
+            <div class="flex items-end gap-1 h-40">
+                {% set max_val = ventas_chart|map(attribute='total_usd')|max %}
+                {% for v in ventas_chart %}
+                <div class="flex-1 flex flex-col items-center gap-1 group">
+                    <div class="w-full bg-brand-500 dark:bg-brand-600 rounded-t transition-all group-hover:bg-brand-400"
+                         style="height: {{ (v.total_usd / max_val * 100) if max_val > 0 else 0 }}%"
+                         title="${{ '%.2f'|format(v.total_usd) }}"></div>
+                    <span class="text-[10px] text-gray-400 rotate-0 hidden sm:block">{{ v.dia[-5:] }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-sm">Sin datos de ventas aún.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Low stock alert -->
+    {% if bajo_stock %}
+    <div class="card p-5">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-red-600 dark:text-red-400">⚠ Productos con Stock Bajo</h2>
+            <a href="/productos" class="text-sm text-brand-600 hover:underline">Ver todos</a>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead><tr><th>Producto</th><th>Stock</th><th>Mínimo</th><th>Precio</th></tr></thead>
+                <tbody>
+                {% for p in bajo_stock %}
+                <tr>
+                    <td class="font-medium">{{ p.nombre }}</td>
+                    <td><span class="badge badge-red">{{ p.stock }}</span></td>
+                    <td>{{ p.stock_minimo }}</td>
+                    <td>${{ "%.2f"|format(p.precio_usd) }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

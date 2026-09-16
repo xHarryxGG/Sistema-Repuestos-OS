@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block page_title %}Reportes{% endblock %}
+{% block content %}
+<div class="space-y-6 animate-fade-in" x-data="{ tipo: '{{ tipo }}' }">
+    <!-- Filtros -->
+    <div class="card p-5">
+        <h3 class="font-semibold mb-4">Filtrar por período</h3>
+        <form method="get" class="space-y-4">
+            <div class="flex flex-wrap gap-2">
+                {% for t, label in [('diario','Día'),('semanal','Semana'),('mensual','Mes'),('anual','Año'),('rango','Rango')] %}
+                <label class="cursor-pointer">
+                    <input type="radio" name="tipo" value="{{ t }}" x-model="tipo" class="sr-only peer">
+                    <span class="inline-block px-4 py-2 rounded-lg text-sm font-medium border transition-colors
+                                 peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600
+                                 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800">
+                        {{ label }}
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Año: visible para semanal, mensual y anual -->
+                <div x-show="['semanal','mensual','anual'].includes(tipo)" x-cloak>
+                    <label class="block text-sm font-medium mb-1">Año</label>
+                    <select name="anio" class="select-field">
+                        {% for a in anios %}
+                        <option value="{{ a }}" {{ 'selected' if a == anio }}>{{ a }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div x-show="tipo === 'mensual'" x-cloak>
+                    <label class="block text-sm font-medium mb-1">Mes</label>
+                    <select name="mes" class="select-field">
+                        {% for m in range(1, 13) %}
+                        <option value="{{ m }}" {{ 'selected' if m == mes }}>
+                            {{ ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][m-1] }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div x-show="tipo === 'semanal'" x-cloak>
+                    <label class="block text-sm font-medium mb-1">Semana (ISO)</label>
+                    <input type="number" name="semana" value="{{ semana }}" min="1" max="53" class="input-field">
+                </div>
+
+                <div x-show="tipo === 'diario'" x-cloak>
+                    <label class="block text-sm font-medium mb-1">Día</label>
+                    <input type="date" name="dia" value="{{ dia }}" class="input-field">
+                </div>
+
+                <div x-show="tipo === 'rango'" x-cloak class="sm:col-span-2">
+                    <label class="block text-sm font-medium mb-1">Desde</label>
+                    <input type="date" name="fecha_desde" value="{{ fecha_desde }}" class="input-field">
+                </div>
+                <div x-show="tipo === 'rango'" x-cloak class="sm:col-span-2">
+                    <label class="block text-sm font-medium mb-1">Hasta</label>
+                    <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" class="input-field">
+                </div>
+            </div>
+
+            <button type="submit" class="btn-primary">Generar reporte</button>
+        </form>
+        <p class="text-sm text-gray-500 mt-3">Período: <strong>{{ etiqueta }}</strong> ({{ fecha_inicio }} — {{ fecha_fin }})</p>
+    </div>
+
+    <!-- Summary -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="stat-card">
+            <p class="text-sm text-gray-500">Ventas</p>
+            <p class="text-2xl font-bold">{{ ventas.num_ventas }}</p>
+            <p class="text-brand-600 text-sm">${{ "%.2f"|format(ventas.total_usd) }}</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-sm text-gray-500">Ingresos USD</p>
+            <p class="text-2xl font-bold text-green-600">${{ "%.2f"|format(ganancias.ingresos_usd) }}</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-sm text-gray-500">Costos USD</p>
+            <p class="text-2xl font-bold text-red-500">${{ "%.2f"|format(ganancias.costos_usd) }}</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-sm text-gray-500">Ganancia Neta</p>
+            <p class="text-2xl font-bold text-brand-600">${{ "%.2f"|format(ganancias.ganancia_usd) }}</p>
+            <p class="text-sm text-gray-500">Margen: {{ ganancias.margen }}%</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card p-5">
+            <h3 class="font-semibold mb-4">Productos Más Vendidos</h3>
+            {% if mas_vendidos %}
+            <div class="space-y-3">
+                {% for p in mas_vendidos %}
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="font-medium text-sm">{{ p.nombre }}</p>
+                        <p class="text-xs text-gray-500">{{ p.total_vendido }} unidades</p>
+                    </div>
+                    <span class="font-semibold text-brand-600">${{ "%.2f"|format(p.total_ingresos_usd) }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-sm">Sin datos en este período</p>
+            {% endif %}
+        </div>
+
+        <div class="card p-5">
+            <h3 class="font-semibold mb-4">Ventas por Método de Pago</h3>
+            {% if ventas.pagos_por_metodo %}
+            <div class="space-y-3">
+                {% for p in ventas.pagos_por_metodo %}
+                <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <span class="text-sm font-medium">{{ metodos_pago.get(p.metodo_pago, p.metodo_pago) }}</span>
+                    <div class="text-right text-sm">
+                        {% if p.total_usd > 0 %}<p>${{ "%.2f"|format(p.total_usd) }}</p>{% endif %}
+                        {% if p.total_bs > 0 %}<p class="text-gray-500">Bs. {{ "%.2f"|format(p.total_bs) }}</p>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-sm">Sin datos en este período</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card p-5">
+        <h3 class="font-semibold mb-4">Ventas por Día</h3>
+        {% if ventas_diarias %}
+        <div class="flex items-end gap-0.5 h-48 overflow-x-auto">
+            {% set max_v = ventas_diarias|map(attribute='total_usd')|max %}
+            {% for v in ventas_diarias %}
+            <div class="flex flex-col items-center min-w-[24px] flex-1 group">
+                <div class="w-full bg-brand-500 rounded-t hover:bg-brand-400 transition-colors"
+                     style="height: {{ (v.total_usd / max_v * 100) if max_v > 0 else 2 }}%"
+                     title="{{ v.dia }}: ${{ '%.2f'|format(v.total_usd) }} ({{ v.num_ventas }} ventas)"></div>
+                <span class="text-[9px] text-gray-400 mt-1 hidden sm:block">{{ v.dia[-5:] }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-500 text-sm">Sin datos de ventas en este período</p>
+        {% endif %}
+    </div>
+
+    {% if bajo_stock %}
+    <div class="card p-5">
+        <h3 class="font-semibold mb-4 text-red-600">Productos con Stock Bajo</h3>
+        <div class="table-container">
+            <table class="data-table">
+                <thead><tr><th>Producto</th><th>Stock</th><th>Mínimo</th></tr></thead>
+                <tbody>
+                {% for p in bajo_stock %}
+                <tr>
+                    <td>{{ p.nombre }}</td>
+                    <td><span class="badge badge-red">{{ p.stock }}</span></td>
+                    <td>{{ p.stock_minimo }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block page_title %}Movimientos{% endblock %}
+{% block content %}
+<div class="space-y-4 animate-fade-in">
+    <p class="text-sm text-gray-500">Registro de ediciones y eliminaciones en productos, clientes y ventas.</p>
+
+    <form method="get" class="flex flex-wrap gap-3">
+        <select name="entidad" class="select-field max-w-xs">
+            <option value="">Todas las entidades</option>
+            {% for key, label in entidades.items() %}
+            <option value="{{ key }}" {{ 'selected' if key == entidad_filter }}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <select name="accion" class="select-field max-w-xs">
+            <option value="">Todas las acciones</option>
+            {% for key, label in acciones.items() %}
+            <option value="{{ key }}" {{ 'selected' if key == accion_filter }}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn-secondary">Filtrar</button>
+        {% if entidad_filter or accion_filter %}
+        <a href="/movimientos" class="btn-secondary">Limpiar</a>
+        {% endif %}
+    </form>
+
+    <div class="table-container card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Entidad</th>
+                    <th>Acción</th>
+                    <th>Descripción</th>
+                    <th>ID</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for m in movimientos %}
+            <tr>
+                <td class="whitespace-nowrap text-sm">{{ m.created_at }}</td>
+                <td>
+                    <span class="badge badge-blue">{{ entidades.get(m.entidad, m.entidad) }}</span>
+                </td>
+                <td>
+                    {% if m.accion == 'eliminar' %}
+                    <span class="badge badge-red">{{ acciones.get(m.accion, m.accion) }}</span>
+                    {% elif m.accion == 'editar' %}
+                    <span class="badge badge-yellow">{{ acciones.get(m.accion, m.accion) }}</span>
+                    {% else %}
+                    <span class="badge badge-green">{{ acciones.get(m.accion, m.accion) }}</span>
+                    {% endif %}
+                </td>
+                <td class="text-sm max-w-md">{{ m.descripcion }}</td>
+                <td class="text-gray-500 text-sm">#{{ m.entidad_id }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-gray-500 py-8">No hay movimientos registrados</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

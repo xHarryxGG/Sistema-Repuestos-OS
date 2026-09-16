@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block page_title %}Registrar Compra de Inventario{% endblock %}
+{% block content %}
+<div x-data="compraApp({{ productos|tojson }})" class="max-w-3xl animate-fade-in">
+    <form method="post" action="/compras/registrar" @submit.prevent="submitCompra">
+        <input type="hidden" name="items_json" :value="JSON.stringify(cart)">
+
+        <div class="card p-6 space-y-4">
+            <div>
+                <label class="block text-sm font-medium mb-1">Proveedor</label>
+                <input type="text" name="proveedor" class="input-field" placeholder="Nombre del proveedor">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-2">Agregar Productos</label>
+                <input type="text" x-model="search" placeholder="Buscar producto..." class="input-field mb-2">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto mb-3">
+                    <template x-for="p in filteredProducts" :key="p.id">
+                        <button type="button" @click="addItem(p)"
+                                class="p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-brand-500 text-left text-sm">
+                            <span class="font-medium" x-text="p.nombre"></span>
+                            <span class="text-xs text-gray-500 block">Stock actual: <span x-text="p.stock"></span></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <div x-show="cart.length > 0">
+                <table class="data-table">
+                    <thead><tr><th>Producto</th><th>Cantidad</th><th>Costo USD</th><th>Subtotal</th><th></th></tr></thead>
+                    <tbody>
+                        <template x-for="(item, idx) in cart" :key="item.producto_id">
+                            <tr>
+                                <td x-text="item.nombre"></td>
+                                <td><input type="number" x-model.number="item.cantidad" min="1" class="input-field w-20" @input="recalcular()"></td>
+                                <td><input type="number" step="0.01" x-model.number="item.precio_usd" class="input-field w-24" @input="recalcular()"></td>
+                                <td x-text="'$' + (item.cantidad * item.precio_usd).toFixed(2)"></td>
+                                <td><button type="button" @click="cart.splice(idx,1); recalcular()" class="text-red-500">✕</button></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+                <p class="text-right font-bold text-lg mt-3">Total: <span x-text="'$' + totalUSD.toFixed(2)"></span></p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-1">Notas</label>
+                <textarea name="notas" rows="2" class="input-field"></textarea>
+            </div>
+
+            <div class="flex gap-3">
+                <button type="submit" :disabled="cart.length === 0" class="btn-primary">Registrar Compra</button>
+                <a href="/compras" class="btn-secondary">Cancelar</a>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function compraApp(productos) {
+    return {
+        productos, cart: [], search: '', totalUSD: 0,
+        get filteredProducts() {
+            if (!this.search) return this.productos.slice(0, 8);
+            const q = this.search.toLowerCase();
+            return this.productos.filter(p => p.nombre.toLowerCase().includes(q)).slice(0, 8);
+        },
+        addItem(p) {
+            const ex = this.cart.find(i => i.producto_id === p.id);
+            if (ex) ex.cantidad++;
+            else this.cart.push({ producto_id: p.id, nombre: p.nombre, cantidad: 1, precio_usd: p.costo_usd || 0 });
+            this.recalcular();
+        },
+        recalcular() {
+            this.totalUSD = this.cart.reduce((s, i) => s + i.cantidad * i.precio_usd, 0);
+        },
+        submitCompra(e) {
+            if (this.cart.length === 0) return;
+            e.target.submit();
+        }
+    };
+}
+</script>
+{% endblock %}

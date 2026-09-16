@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block page_title %}Compras (Inventario){% endblock %}
+{% block content %}
+<div class="space-y-4 animate-fade-in">
+    <div class="flex justify-end">
+        <a href="/compras/registrar" class="btn-primary">+ Registrar Compra</a>
+    </div>
+
+    <div class="table-container card">
+        <table class="data-table">
+            <thead><tr><th>#</th><th>Fecha</th><th>Proveedor</th><th>Total USD</th><th>Notas</th></tr></thead>
+            <tbody>
+            {% for c in compras %}
+            <tr>
+                <td>#{{ c.id }}</td>
+                <td>{{ c.fecha }}</td>
+                <td>{{ c.proveedor or '—' }}</td>
+                <td class="font-semibold">${{ "%.2f"|format(c.total_usd) }}</td>
+                <td class="text-gray-500 text-sm">{{ c.notas or '—' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-gray-500 py-8">No hay compras registradas</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

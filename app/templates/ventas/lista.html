@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block page_title %}Historial de Ventas{% endblock %}
+{% block content %}
+<div class="space-y-4 animate-fade-in">
+    <div class="flex flex-col sm:flex-row gap-3 justify-between">
+        <form method="get" class="flex gap-2">
+            <input type="date" name="fecha" value="{{ fecha }}" class="input-field">
+            <button type="submit" class="btn-secondary">Filtrar</button>
+            {% if fecha %}<a href="/ventas" class="btn-secondary">Limpiar</a>{% endif %}
+        </form>
+        <a href="/ventas/registrar" class="btn-primary">+ Nueva Venta</a>
+    </div>
+
+    <div class="table-container card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>Productos</th>
+                    <th>Total USD</th>
+                    <th>Total Bs</th>
+                    <th class="text-right">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for v in ventas %}
+            <tr>
+                <td class="font-medium">#{{ v.id }}</td>
+                <td class="whitespace-nowrap text-sm">{{ v.fecha[:16] if v.fecha|length > 10 else v.fecha }}</td>
+                <td>{{ v.cliente_nombre or '—' }}</td>
+                <td class="text-sm text-gray-600 dark:text-gray-400 max-w-xs">
+                    <span class="line-clamp-2" title="{{ v.productos or '' }}">{{ v.productos or '—' }}</span>
+                </td>
+                <td class="font-semibold text-brand-600 whitespace-nowrap">${{ "%.2f"|format(v.total_usd) }}</td>
+                <td class="whitespace-nowrap">Bs. {{ "%.2f"|format(v.total_bs) }}</td>
+                <td class="text-right whitespace-nowrap space-x-2">
+                    <a href="/ventas/{{ v.id }}" class="text-brand-600 hover:underline text-sm">Ver</a>
+                    <form method="post" action="/ventas/{{ v.id }}/eliminar" class="inline"
+                          onsubmit="return confirm('¿Eliminar venta #{{ v.id }}? Los productos volverán al stock.')">
+                        <button type="submit" class="text-red-500 hover:underline text-sm">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-gray-500 py-8">No hay ventas registradas</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block page_title %}Productos{% endblock %}
+{% block content %}
+<div class="space-y-4 animate-fade-in">
+    <div class="flex flex-col sm:flex-row gap-3 justify-between">
+        <form method="get" class="flex flex-wrap gap-2 flex-1">
+            <input type="text" name="q" value="{{ q }}" placeholder="Buscar producto..." class="input-field max-w-xs">
+            <select name="categoria" class="select-field max-w-xs">
+                <option value="">Todas las categorías</option>
+                {% for cat in categorias %}
+                <option value="{{ cat }}" {{ 'selected' if cat == categoria_filter }}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn-secondary">Filtrar</button>
+        </form>
+        <a href="/productos/nuevo" class="btn-primary">+ Nuevo Producto</a>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {% for p in productos %}
+        <div class="card p-4 flex flex-col">
+            <div class="flex justify-between items-start mb-2">
+                <h3 class="font-semibold text-sm leading-tight">{{ p.nombre }}</h3>
+                {% if p.stock <= p.stock_minimo %}
+                <span class="badge badge-red">{{ p.stock }} uds</span>
+                {% else %}
+                <span class="badge badge-green">{{ p.stock }} uds</span>
+                {% endif %}
+            </div>
+            {% if p.codigo %}<p class="text-xs text-gray-500 mb-1">Cód: {{ p.codigo }}</p>{% endif %}
+            {% if p.categoria %}<p class="text-xs text-gray-500 mb-2">{{ p.categoria }}</p>{% endif %}
+            <p class="text-lg font-bold text-brand-600 dark:text-brand-400 mt-auto">${{ "%.2f"|format(p.precio_usd) }}</p>
+            <p class="text-xs text-gray-500">Bs. {{ "%.2f"|format(p.precio_usd * tasa_cambio) }}</p>
+            <div class="flex gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                <a href="/productos/{{ p.id }}/editar" class="text-sm text-brand-600 hover:underline flex-1 text-center">Editar</a>
+                <form method="post" action="/productos/{{ p.id }}/eliminar" onsubmit="return confirm('¿Desactivar producto?')">
+                    <button type="submit" class="text-sm text-red-500 hover:underline">Eliminar</button>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-span-full text-center text-gray-500 py-12">No hay productos registrados</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

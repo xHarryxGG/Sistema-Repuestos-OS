@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block page_title %}{{ 'Editar' if producto else 'Nuevo' }} Producto{% endblock %}
+{% block content %}
+<div class="max-w-xl animate-fade-in">
+    <div class="card p-6">
+        <form method="post" action="{{ '/productos/' ~ producto.id ~ '/editar' if producto else '/productos/nuevo' }}" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium mb-1">Nombre *</label>
+                <input type="text" name="nombre" value="{{ producto.nombre if producto else '' }}" required class="input-field">
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Código</label>
+                    <input type="text" name="codigo" value="{{ producto.codigo if producto else '' }}" class="input-field">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Categoría</label>
+                    <input type="text" name="categoria" value="{{ producto.categoria if producto else '' }}" class="input-field">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Descripción</label>
+                <textarea name="descripcion" rows="2" class="input-field">{{ producto.descripcion if producto else '' }}</textarea>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Precio USD *</label>
+                    <input type="number" step="0.01" name="precio_usd" value="{{ producto.precio_usd if producto else '' }}" required class="input-field">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Costo USD</label>
+                    <input type="number" step="0.01" name="costo_usd" value="{{ producto.costo_usd if producto else '0' }}" class="input-field">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Stock</label>
+                    <input type="number" name="stock" value="{{ producto.stock if producto else '0' }}" class="input-field">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Stock Mín.</label>
+                    <input type="number" name="stock_minimo" value="{{ producto.stock_minimo if producto else '5' }}" class="input-field">
+                </div>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="submit" class="btn-primary">Guardar</button>
+                <a href="/productos" class="btn-secondary">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
