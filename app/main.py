@@ -10,7 +10,10 @@ from app.routers import dashboard, clientes, productos, ventas, compras, cierre,
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    try:
+        init_db()
+    except Exception as e:
+        print("Warning: lifespan init_db non-fatal error:", e)
     yield
 
 
@@ -21,8 +24,13 @@ app = FastAPI(
 )
 
 static_dir = Path(__file__).parent / "static"
-static_dir.mkdir(exist_ok=True)
-app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+try:
+    static_dir.mkdir(exist_ok=True)
+except Exception:
+    pass
+
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 app.include_router(dashboard.router)
 app.include_router(clientes.router)
