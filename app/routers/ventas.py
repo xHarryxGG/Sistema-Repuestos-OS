@@ -54,11 +54,19 @@ def _registrar_pago(
         )
 
 
+from app.database import get_db, is_postgres
+
+
 @router.get("/", response_class=HTMLResponse)
 async def listar_ventas(request: Request, fecha: str = ""):
-    query = """
+    concat_fn = (
+        "STRING_AGG(p.nombre || ' x' || CAST(vd.cantidad AS TEXT), ', ')"
+        if is_postgres()
+        else "GROUP_CONCAT(p.nombre || ' x' || vd.cantidad, ', ')"
+    )
+    query = f"""
         SELECT v.*, c.nombre as cliente_nombre,
-               (SELECT GROUP_CONCAT(p.nombre || ' x' || vd.cantidad, ', ')
+               (SELECT {concat_fn}
                 FROM venta_detalles vd
                 JOIN productos p ON p.id = vd.producto_id
                 WHERE vd.venta_id = v.id) as productos
@@ -76,6 +84,7 @@ async def listar_ventas(request: Request, fecha: str = ""):
     ctx = template_context(request)
     ctx.update({"active": "ventas", "ventas": [dict(r) for r in rows], "fecha": fecha})
     return templates.TemplateResponse("ventas/lista.html", ctx)
+
 
 
 @router.get("/registrar", response_class=HTMLResponse)
@@ -210,7 +219,6 @@ async def detalle_venta(request: Request, venta_id: int):
         "detalles": [dict(d) for d in detalles],
         "pagos": [dict(p) for p in pagos],
     })
-    return templates.TemplateResponse("ventas/detalle.html", ctx)
     return templates.TemplateResponse("ventas/detalle.html", ctx)
 
 

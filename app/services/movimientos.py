@@ -32,10 +32,11 @@ def registrar_movimiento(
             entidad_id,
             accion,
             descripcion,
-            json.dumps(datos_anteriores, ensure_ascii=False) if datos_anteriores else None,
-            json.dumps(datos_nuevos, ensure_ascii=False) if datos_nuevos else None,
+            json.dumps(datos_anteriores, ensure_ascii=False, default=str) if datos_anteriores else None,
+            json.dumps(datos_nuevos, ensure_ascii=False, default=str) if datos_nuevos else None,
         ),
     )
+
 
 
 def listar_movimientos(
