@@ -6,22 +6,44 @@ from app.database import get_db
 BCV_URL = "https://www.bcv.org.ve/"
 
 
+import time
+
+_tasa_cache = None
+_tasa_cache_time = 0
+
+
 def get_tasa_local() -> float:
+    global _tasa_cache, _tasa_cache_time
+    now = time.time()
+    if _tasa_cache is not None and (now - _tasa_cache_time < 60):
+        return _tasa_cache
     with get_db() as conn:
         row = conn.execute(
             "SELECT valor FROM configuracion WHERE clave = 'tasa_cambio'"
         ).fetchone()
-        return round(float(row["valor"]), 2) if row else 36.50
+        val = round(float(row["valor"]), 2) if row else 36.50
+        _tasa_cache = val
+        _tasa_cache_time = now
+        return val
 
 
 def set_tasa_local(tasa: float) -> float:
+    global _tasa_cache, _tasa_cache_time
     tasa = round(tasa, 2)
     with get_db() as conn:
         conn.execute(
             "UPDATE configuracion SET valor = ?, updated_at = CURRENT_TIMESTAMP WHERE clave = 'tasa_cambio'",
             (str(tasa),),
         )
+    _tasa_cache = tasa
+    _tasa_cache_time = time.time()
+    try:
+        from app.dependencies import invalidate_config_cache
+        invalidate_config_cache()
+    except Exception:
+        pass
     return tasa
+
 
 
 async def fetch_tasa_bcv() -> dict:

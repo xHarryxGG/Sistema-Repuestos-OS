@@ -186,24 +186,27 @@ def anios_disponibles() -> list[int]:
 def resumen_dashboard() -> dict:
     with get_db() as conn:
         hoy = datetime.now().strftime("%Y-%m-%d")
-        ventas_hoy = conn.execute(
-            "SELECT COUNT(*) as n, COALESCE(SUM(total_usd),0) as t FROM ventas WHERE date(fecha)=?",
-            (hoy,),
+        row = conn.execute(
+            """SELECT 
+                (SELECT COUNT(*) FROM clientes) as total_clientes,
+                (SELECT COUNT(*) FROM productos WHERE activo=1) as total_productos,
+                (SELECT COUNT(*) FROM productos WHERE activo=1 AND stock <= stock_minimo) as bajo_stock,
+                (SELECT COUNT(*) FROM ventas WHERE date(fecha)=?) as ventas_hoy_n,
+                (SELECT COALESCE(SUM(total_usd),0) FROM ventas WHERE date(fecha)=?) as ventas_hoy_t
+            """,
+            (hoy, hoy),
         ).fetchone()
-        total_clientes = conn.execute("SELECT COUNT(*) as n FROM clientes").fetchone()["n"]
-        total_productos = conn.execute(
-            "SELECT COUNT(*) as n FROM productos WHERE activo=1"
-        ).fetchone()["n"]
-        bajo_stock = conn.execute(
-            "SELECT COUNT(*) as n FROM productos WHERE activo=1 AND stock <= stock_minimo"
-        ).fetchone()["n"]
 
     inicio, fin, _ = get_rango_fechas("mensual")
     ganancia_mes = reporte_ganancias(inicio, fin)
     return {
-        "ventas_hoy": dict(ventas_hoy),
-        "total_clientes": total_clientes,
-        "total_productos": total_productos,
-        "bajo_stock": bajo_stock,
+        "ventas_hoy": {
+            "n": row["ventas_hoy_n"] if row else 0,
+            "t": row["ventas_hoy_t"] if row else 0,
+        },
+        "total_clientes": row["total_clientes"] if row else 0,
+        "total_productos": row["total_productos"] if row else 0,
+        "bajo_stock": row["bajo_stock"] if row else 0,
         "ganancia_mes": ganancia_mes,
     }
+

@@ -141,17 +141,67 @@ def get_connection():
         return conn
 
 
+_pg_pool = None
+
+
+def get_pg_pool():
+    global _pg_pool
+    if _pg_pool is None or getattr(_pg_pool, "closed", True):
+        import psycopg2.pool
+        db_url = get_database_url()
+        if db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgres://", "postgresql://", 1)
+        kwargs = {"connect_timeout": 10}
+        if "sslmode" not in db_url.lower():
+            kwargs["sslmode"] = "require"
+        _pg_pool = psycopg2.pool.ThreadedConnectionPool(1, 10, db_url, **kwargs)
+    return _pg_pool
+
+
 @contextmanager
 def get_db():
-    conn = get_connection()
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    if is_postgres():
+        pool = None
+        raw_conn = None
+        conn = None
+        try:
+            try:
+                pool = get_pg_pool()
+                raw_conn = pool.getconn()
+                if getattr(raw_conn, "closed", 1) != 0:
+                    raw_conn = pool.getconn()
+                conn = PostgresConnectionWrapper(raw_conn)
+            except Exception as pool_err:
+                pool = None
+                conn = get_connection()
+            yield conn
+            conn.commit()
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            raise e
+        finally:
+            if pool and raw_conn:
+                try:
+                    pool.putconn(raw_conn)
+                except Exception:
+                    pass
+            elif not pool and conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+    else:
+        conn = get_connection()
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
 
 
 def init_db():

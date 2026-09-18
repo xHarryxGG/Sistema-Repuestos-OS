@@ -181,7 +181,14 @@ async def procesar_venta(
             datos_nuevos={"productos": productos_vendidos, "total_usd": total_usd, "metodo_pago": metodo_pago},
         )
 
+    try:
+        from app.routers.dashboard import invalidate_dashboard_cache
+        invalidate_dashboard_cache()
+    except Exception:
+        pass
+
     return RedirectResponse(f"/ventas/{venta_id}", status_code=303)
+
 
 
 @router.get("/{venta_id}", response_class=HTMLResponse)
@@ -250,7 +257,14 @@ async def eliminar_venta(venta_id: int):
         )
         conn.execute("DELETE FROM ventas WHERE id=?", (venta_id,))
 
+    try:
+        from app.routers.dashboard import invalidate_dashboard_cache
+        invalidate_dashboard_cache()
+    except Exception:
+        pass
+
     return RedirectResponse("/ventas", status_code=303)
+
 
 
 @router.get("/api/productos")
