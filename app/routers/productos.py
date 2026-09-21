@@ -11,20 +11,10 @@ router = APIRouter(prefix="/productos", tags=["productos"])
 
 @router.get("/", response_class=HTMLResponse)
 async def listar_productos(request: Request, q: str = "", categoria: str = ""):
-    query = "SELECT * FROM productos WHERE activo=1"
-    params: list = []
-    if q:
-        query += " AND (nombre LIKE ? OR codigo LIKE ?)"
-        params.extend([f"%{q}%", f"%{q}%"])
-    if categoria:
-        query += " AND categoria = ?"
-        params.append(categoria)
-    query += " ORDER BY nombre"
-
     with get_db() as conn:
-        rows = conn.execute(query, params).fetchall()
+        rows = conn.execute("SELECT * FROM productos WHERE activo=1 ORDER BY nombre").fetchall()
         categorias = conn.execute(
-            "SELECT DISTINCT categoria FROM productos WHERE categoria IS NOT NULL AND categoria != ''"
+            "SELECT DISTINCT categoria FROM productos WHERE activo=1 AND categoria IS NOT NULL AND categoria != '' ORDER BY categoria"
         ).fetchall()
 
     ctx = template_context(request)

@@ -1,46 +1,202 @@
 {% extends "base.html" %}
 {% block page_title %}Productos{% endblock %}
 {% block content %}
-<div class="space-y-4 animate-fade-in">
-    <div class="flex flex-col sm:flex-row gap-3 justify-between">
-        <form method="get" class="flex flex-wrap gap-2 flex-1">
-            <input type="text" name="q" value="{{ q }}" placeholder="Buscar producto..." class="input-field max-w-xs">
-            <select name="categoria" class="select-field max-w-xs">
-                <option value="">Todas las categorías</option>
-                {% for cat in categorias %}
-                <option value="{{ cat }}" {{ 'selected' if cat == categoria_filter }}>{{ cat }}</option>
-                {% endfor %}
-            </select>
-            <button type="submit" class="btn-secondary">Filtrar</button>
-        </form>
-        <a href="/productos/nuevo" class="btn-primary">+ Nuevo Producto</a>
-    </div>
+<div x-data="productosApp({{ productos|tojson }}, {{ tasa_cambio }}, '{{ q|escape }}', '{{ categoria_filter|escape }}')" class="space-y-4 animate-fade-in">
+    <!-- Barra superior de filtros dinámicos -->
+    <div class="card p-4">
+        <div class="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+            <div class="flex flex-col sm:flex-row gap-2 flex-1 items-stretch sm:items-center">
+                <!-- Buscador dinámico con icono y botón de limpiar -->
+                <div class="relative flex-1 max-w-md">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                    <input type="text"
+                           x-model="search"
+                           placeholder="Buscar por nombre, código o compatibilidad..."
+                           class="input-field pl-9 pr-8 w-full"
+                           autocomplete="off">
+                    <button type="button"
+                            x-show="search.length > 0"
+                            @click="search = ''"
+                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                        ✕
+                    </button>
+                </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {% for p in productos %}
-        <div class="card p-4 flex flex-col">
-            <div class="flex justify-between items-start gap-2 mb-2">
-                <h3 class="font-semibold text-sm leading-tight flex-1 min-w-0 pr-1">{{ p.nombre }}</h3>
-                {% if p.stock <= p.stock_minimo %}
-                <span class="badge badge-red shrink-0 whitespace-nowrap">{{ p.stock }} uds</span>
-                {% else %}
-                <span class="badge badge-green shrink-0 whitespace-nowrap">{{ p.stock }} uds</span>
-                {% endif %}
+                <!-- Selector dinámico de categoría -->
+                <select x-model="selectedCategory" class="select-field sm:max-w-xs">
+                    <option value="">Todas las categorías</option>
+                    {% for cat in categorias %}
+                    <option value="{{ cat }}">{{ cat }}</option>
+                    {% endfor %}
+                </select>
+
+                <!-- Botón reset si hay algún filtro activo -->
+                <button type="button"
+                        x-show="search || selectedCategory || stockFilter !== 'todos'"
+                        @click="clearFilters()"
+                        class="btn-secondary text-xs sm:text-sm py-2 px-3 whitespace-nowrap">
+                    Limpiar filtros
+                </button>
             </div>
-            {% if p.codigo %}<p class="text-xs text-gray-500 mb-1">Cód: {{ p.codigo }}</p>{% endif %}
-            {% if p.categoria %}<p class="text-xs text-gray-500 mb-2">{{ p.categoria }}</p>{% endif %}
-            <p class="text-lg font-bold text-brand-600 dark:text-brand-400 mt-auto">${{ "%.2f"|format(p.precio_usd) }}</p>
-            <p class="text-xs text-gray-500">Bs. {{ "%.2f"|format(p.precio_usd * tasa_cambio) }}</p>
-            <div class="flex gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
-                <a href="/productos/{{ p.id }}/editar" class="text-sm text-brand-600 hover:underline flex-1 text-center">Editar</a>
-                <form method="post" action="/productos/{{ p.id }}/eliminar" onsubmit="return confirm('¿Desactivar producto?')">
-                    <button type="submit" class="text-sm text-red-500 hover:underline">Eliminar</button>
-                </form>
+
+            <!-- Botón nuevo producto -->
+            <div class="flex items-center gap-3">
+                <a href="/productos/nuevo" class="btn-primary whitespace-nowrap text-center flex-1 sm:flex-initial">
+                    + Nuevo Producto
+                </a>
             </div>
         </div>
-        {% else %}
-        <div class="col-span-full text-center text-gray-500 py-12">No hay productos registrados</div>
-        {% endfor %}
+
+        <!-- Barra secundaria: Filtros rápidos de stock y contador -->
+        <div class="flex flex-wrap items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 text-xs sm:text-sm">
+            <div class="flex items-center gap-1 sm:gap-2">
+                <span class="text-gray-500 mr-1 hidden sm:inline">Stock:</span>
+                <button type="button"
+                        @click="stockFilter = 'todos'"
+                        :class="stockFilter === 'todos' ? 'bg-brand-600 text-white font-medium shadow-sm' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'"
+                        class="px-2.5 py-1 rounded-md transition-colors">
+                    Todos
+                </button>
+                <button type="button"
+                        @click="stockFilter = 'disponibles'"
+                        :class="stockFilter === 'disponibles' ? 'bg-brand-600 text-white font-medium shadow-sm' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'"
+                        class="px-2.5 py-1 rounded-md transition-colors">
+                    Disponibles
+                </button>
+                <button type="button"
+                        @click="stockFilter = 'bajo_stock'"
+                        :class="stockFilter === 'bajo_stock' ? 'bg-amber-600 text-white font-medium shadow-sm' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'"
+                        class="px-2.5 py-1 rounded-md transition-colors">
+                    Bajo Stock / Agotado
+                </button>
+            </div>
+
+            <!-- Indicador reactivo de resultados -->
+            <div class="text-gray-500">
+                Mostrando <span class="font-semibold text-gray-900 dark:text-gray-100" x-text="filteredProducts.length"></span> de <span x-text="productos.length"></span> productos
+            </div>
+        </div>
+    </div>
+
+    <!-- Cuadrícula reactiva de productos -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <template x-for="p in filteredProducts" :key="p.id">
+            <div class="card p-4 flex flex-col hover:border-brand-500/50 hover:shadow-md transition-all">
+                <!-- Encabezado con título y badge de stock -->
+                <div class="flex justify-between items-start gap-2 mb-2">
+                    <h3 class="font-semibold text-sm leading-tight flex-1 min-w-0 pr-1 text-gray-900 dark:text-gray-100" x-text="p.nombre"></h3>
+                    <span :class="p.stock <= 0 ? 'badge badge-red' : (p.stock <= (p.stock_minimo ?? 5) ? 'badge bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' : 'badge badge-green')"
+                          class="shrink-0 whitespace-nowrap text-xs"
+                          x-text="p.stock + ' uds'">
+                    </span>
+                </div>
+
+                <!-- Código y Categoría -->
+                <div class="space-y-0.5 mb-2">
+                    <p x-show="p.codigo" class="text-xs text-gray-500 dark:text-gray-400" x-text="'Cód: ' + p.codigo"></p>
+                    <p x-show="p.categoria" class="text-xs text-brand-600 dark:text-brand-400 font-medium" x-text="p.categoria"></p>
+                    <p x-show="p.descripcion" class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2" :title="p.descripcion" x-text="p.descripcion"></p>
+                </div>
+
+                <!-- Precios en USD y Bs -->
+                <div class="mt-auto pt-2">
+                    <p class="text-lg font-bold text-brand-600 dark:text-brand-400" x-text="'$' + Number(p.precio_usd).toFixed(2)"></p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400" x-text="'Bs. ' + (Number(p.precio_usd) * tasa).toFixed(2)"></p>
+                </div>
+
+                <!-- Acciones del producto -->
+                <div class="flex gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                    <a :href="'/productos/' + p.id + '/editar'" class="text-sm text-brand-600 dark:text-brand-400 hover:underline flex-1 text-center font-medium">
+                        Editar
+                    </a>
+                    <form method="post" :action="'/productos/' + p.id + '/eliminar'" onsubmit="return confirm('¿Desactivar producto?')">
+                        <button type="submit" class="text-sm text-red-500 hover:underline">
+                            Eliminar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </template>
+
+        <!-- Estado vacío cuando la búsqueda no arroja resultados -->
+        <div x-show="filteredProducts.length === 0" class="col-span-full card p-12 text-center text-gray-500 space-y-3">
+            <svg class="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+            </svg>
+            <p class="font-medium text-gray-700 dark:text-gray-300">No se encontraron productos coincidentes</p>
+            <p class="text-sm text-gray-400">Intenta cambiar el término de búsqueda o selecciona otra categoría.</p>
+            <div class="pt-2">
+                <button type="button" @click="clearFilters()" class="btn-secondary text-sm">
+                    Restablecer filtros
+                </button>
+            </div>
+        </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function productosApp(productos, tasaCambio, initialSearch = '', initialCategory = '') {
+    return {
+        productos: productos || [],
+        tasa: Number(tasaCambio) || 1,
+        search: initialSearch || '',
+        selectedCategory: initialCategory || '',
+        stockFilter: 'todos', // 'todos', 'disponibles', 'bajo_stock'
+
+        normalize(str) {
+            if (!str) return '';
+            return str.toString()
+                      .toLowerCase()
+                      .normalize("NFD")
+                      .replace(/[\u0300-\u036f]/g, "")
+                      .trim();
+        },
+
+        clearFilters() {
+            this.search = '';
+            this.selectedCategory = '';
+            this.stockFilter = 'todos';
+        },
+
+        get filteredProducts() {
+            const q = this.normalize(this.search);
+            const cat = this.selectedCategory;
+            const stockMod = this.stockFilter;
+
+            return this.productos.filter(p => {
+                // Filtro por categoría
+                if (cat && p.categoria !== cat) {
+                    return false;
+                }
+
+                // Filtro por estado de stock
+                const stockMin = p.stock_minimo !== undefined && p.stock_minimo !== null ? p.stock_minimo : 5;
+                if (stockMod === 'disponibles' && p.stock <= 0) {
+                    return false;
+                }
+                if (stockMod === 'bajo_stock' && p.stock > stockMin) {
+                    return false;
+                }
+
+                // Filtro por texto (nombre, código, descripción)
+                if (!q) {
+                    return true;
+                }
+
+                const nombre = this.normalize(p.nombre);
+                const codigo = this.normalize(p.codigo);
+                const desc = this.normalize(p.descripcion);
+
+                return nombre.includes(q) || codigo.includes(q) || desc.includes(q);
+            });
+        }
+    };
+}
+</script>
 {% endblock %}
