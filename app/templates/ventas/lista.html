@@ -29,7 +29,10 @@
             <tr>
                 <td class="font-medium">#{{ v.id }}</td>
                 <td class="whitespace-nowrap text-sm">{{ v.fecha[:16] if v.fecha|length > 10 else v.fecha }}</td>
-                <td>{{ v.cliente_nombre or '—' }}</td>
+                <td>
+                    <span class="font-medium">{{ v.cliente_nombre or '—' }}</span>
+                    {% if v.cliente_cedula %}<span class="block text-xs text-gray-500">{{ v.cliente_cedula }}</span>{% endif %}
+                </td>
                 <td class="text-sm text-gray-600 dark:text-gray-400 max-w-xs">
                     <span class="line-clamp-2" title="{{ v.productos or '' }}">{{ v.productos or '—' }}</span>
                 </td>

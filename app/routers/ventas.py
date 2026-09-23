@@ -65,7 +65,7 @@ async def listar_ventas(request: Request, fecha: str = ""):
         else "GROUP_CONCAT(p.nombre || ' x' || vd.cantidad, ', ')"
     )
     query = f"""
-        SELECT v.*, c.nombre as cliente_nombre,
+        SELECT v.*, c.nombre as cliente_nombre, c.cedula as cliente_cedula,
                (SELECT {concat_fn}
                 FROM venta_detalles vd
                 JOIN productos p ON p.id = vd.producto_id
@@ -195,7 +195,8 @@ async def procesar_venta(
 async def detalle_venta(request: Request, venta_id: int):
     with get_db() as conn:
         venta = conn.execute(
-            """SELECT v.*, c.nombre as cliente_nombre, c.telefono as cliente_telefono
+            """SELECT v.*, c.nombre as cliente_nombre, c.cedula as cliente_cedula,
+                      c.telefono as cliente_telefono, c.email as cliente_email, c.direccion as cliente_direccion
                FROM ventas v LEFT JOIN clientes c ON c.id = v.cliente_id WHERE v.id=?""",
             (venta_id,),
         ).fetchone()
