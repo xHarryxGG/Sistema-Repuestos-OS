@@ -60,14 +60,31 @@
 
         <div class="table-container mb-4">
             <table class="data-table">
-                <thead><tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th class="text-center">Cant.</th>
+                        <th>Precio USD</th>
+                        <th>Precio Bs (sin IVA)</th>
+                        <th class="text-right">Subtotal</th>
+                    </tr>
+                </thead>
                 <tbody>
                 {% for d in detalles %}
                 <tr>
-                    <td>{{ d.producto_nombre }}{% if d.codigo %} <span class="text-gray-400 text-xs">({{ d.codigo }})</span>{% endif %}</td>
-                    <td>{{ d.cantidad }}</td>
-                    <td>${{ "%.2f"|format(d.precio_unitario_usd) }}</td>
-                    <td class="font-semibold">${{ "%.2f"|format(d.subtotal_usd) }}</td>
+                    <td>
+                        <div class="font-medium">{{ d.producto_nombre }}</div>
+                        {% if d.codigo %}<div class="text-gray-400 text-xs">Cód: {{ d.codigo }}</div>{% endif %}
+                    </td>
+                    <td class="text-center">{{ d.cantidad }}</td>
+                    <td class="whitespace-nowrap">${{ "%.2f"|format(d.precio_unitario_usd) }}</td>
+                    <td class="text-brand-600 dark:text-brand-400 font-semibold whitespace-nowrap">
+                        Bs. {{ "%.2f"|format(d.precio_bs_sin_iva) }}
+                    </td>
+                    <td class="text-right whitespace-nowrap">
+                        <div class="font-semibold">${{ "%.2f"|format(d.subtotal_usd) }}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">Bs. {{ "%.2f"|format(d.subtotal_bs_sin_iva) }} <span class="text-[10px] text-gray-400">(s/IVA)</span></div>
+                    </td>
                 </tr>
                 {% endfor %}
                 </tbody>

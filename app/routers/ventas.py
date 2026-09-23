@@ -216,6 +216,28 @@ async def detalle_venta(request: Request, venta_id: int):
                WHERE vd.venta_id=?""",
             (venta_id,),
         ).fetchall()
+
+        tasa = float(vdict.get("tasa_cambio") or 1.0)
+        detalles_procesados = []
+        for d in detalles:
+            item = dict(d)
+            precio_usd = float(item.get("precio_unitario_usd") or 0.0)
+            subtotal_usd = float(item.get("subtotal_usd") or 0.0)
+            
+            # Precios en Bs
+            item["precio_unitario_bs"] = round(precio_usd * tasa, 2)
+            item["subtotal_bs"] = round(subtotal_usd * tasa, 2)
+            
+            # Precios en Bs sin IVA (base imponible dividiendo entre 1.16)
+            item["precio_bs_sin_iva"] = round((precio_usd * tasa) / 1.16, 2)
+            item["subtotal_bs_sin_iva"] = round((subtotal_usd * tasa) / 1.16, 2)
+            
+            # Precios en USD sin IVA
+            item["precio_usd_sin_iva"] = round(precio_usd / 1.16, 2)
+            item["subtotal_usd_sin_iva"] = round(subtotal_usd / 1.16, 2)
+            
+            detalles_procesados.append(item)
+
         pagos = conn.execute(
             "SELECT * FROM venta_pagos WHERE venta_id=?", (venta_id,)
         ).fetchall()
@@ -224,7 +246,7 @@ async def detalle_venta(request: Request, venta_id: int):
     ctx.update({
         "active": "ventas",
         "venta": vdict,
-        "detalles": [dict(d) for d in detalles],
+        "detalles": detalles_procesados,
         "pagos": [dict(p) for p in pagos],
     })
     return templates.TemplateResponse("ventas/detalle.html", ctx)
