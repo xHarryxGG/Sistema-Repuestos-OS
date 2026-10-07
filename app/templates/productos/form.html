@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block page_title %}{{ 'Editar' if producto and producto.id else 'Nuevo' }} Producto{% endblock %}
 {% block content %}
-<div class="max-w-xl animate-fade-in" x-data="productoForm('{{ producto.codigo if producto and producto.codigo else "" }}', {{ producto.id if producto and producto.id else 0 }})">
+<div class="max-w-xl animate-fade-in" x-data="productoForm('{{ producto.codigo if producto and producto.codigo else "" }}', {{ producto.id if producto and producto.id else 0 }}, '{{ producto.costo_usd if producto and producto.costo_usd is not none else "0" }}', '{{ producto.precio_usd if producto and producto.precio_usd is not none else "" }}')">
     <div class="card p-6">
         {% if error %}
         <div class="mb-4 p-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm flex items-center gap-3">
@@ -36,15 +36,57 @@
                 <label class="block text-sm font-medium mb-1">Descripción</label>
                 <textarea name="descripcion" rows="2" class="input-field" placeholder="Descripción del producto...">{{ producto.descripcion if producto else '' }}</textarea>
             </div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div>
-                    <label class="block text-sm font-medium mb-1">Precio USD *</label>
-                    <input type="number" step="0.01" name="precio_usd" value="{{ producto.precio_usd if producto else '' }}" required class="input-field">
+
+            <!-- Sección de Costo, Margen de Ganancia y Precio -->
+            <div class="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-100 dark:border-gray-800 space-y-3">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                    <!-- Costo USD -->
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Costo USD</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 text-sm">$</span>
+                            <input type="number" step="0.01" name="costo_usd" x-model.number="costo"
+                                   class="input-field pl-7 w-full" placeholder="0.00">
+                        </div>
+                    </div>
+
+                    <!-- Input porcentaje ganancia (40% por defecto) + Botón calcular -->
+                    <div>
+                        <label class="block text-sm font-medium mb-1">% Ganancia</label>
+                        <div class="flex gap-1.5 items-center">
+                            <div class="relative flex-1">
+                                <input type="number" step="any" x-model.number="porcentaje" @keydown.enter.prevent="calcularPrecio()"
+                                       class="input-field pr-6 w-full text-center" placeholder="40">
+                                <span class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-500 text-xs font-semibold">%</span>
+                            </div>
+                            <button type="button" @click="calcularPrecio()"
+                                    class="btn-secondary text-xs sm:text-sm py-2 px-3 whitespace-nowrap bg-brand-50 hover:bg-brand-100 text-brand-700 border-brand-200 dark:bg-brand-900/30 dark:text-brand-300 dark:border-brand-800 font-medium transition-colors"
+                                    title="Calcular precio de venta según porcentaje de ganancia">
+                                Calcular
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Precio USD -->
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Precio USD *</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 text-sm font-bold">$</span>
+                            <input type="number" step="0.01" name="precio_usd" x-model.number="precio" required
+                                   class="input-field pl-7 w-full font-semibold text-brand-600 dark:text-brand-400" placeholder="0.00">
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Costo USD</label>
-                    <input type="number" step="0.01" name="costo_usd" value="{{ producto.costo_usd if producto else '0' }}" class="input-field">
+
+                <!-- Indicador de ganancia calculada -->
+                <div x-show="costo > 0 && precio > 0" class="text-xs text-gray-500 dark:text-gray-400 flex justify-between items-center px-1 pt-1 border-t border-gray-200/50 dark:border-gray-700/50">
+                    <span>Ganancia estimada: <strong class="text-green-600 dark:text-green-400 font-semibold" x-text="'$' + Math.max(0, (precio - costo)).toFixed(2)"></strong></span>
+                    <span x-show="costo > 0" x-text="'Margen aplicado: ' + (((precio - costo) / costo) * 100).toFixed(1) + '%'"></span>
                 </div>
+            </div>
+
+            <!-- Stock y Stock Mínimo -->
+            <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium mb-1">Stock</label>
                     <input type="number" name="stock" value="{{ producto.stock if producto else '0' }}" class="input-field">
@@ -54,6 +96,7 @@
                     <input type="number" name="stock_minimo" value="{{ producto.stock_minimo if producto else '5' }}" class="input-field">
                 </div>
             </div>
+
             <div class="flex gap-3 pt-2">
                 <button type="submit" :disabled="codigoDuplicado" class="btn-primary">Guardar</button>
                 <a href="/productos" class="btn-secondary">Cancelar</a>
@@ -65,12 +108,26 @@
 
 {% block scripts %}
 <script>
-function productoForm(codigoInicial, productId) {
+function productoForm(codigoInicial, productId, costoInicial, precioInicial) {
     return {
         codigo: codigoInicial || '',
         productId: productId || 0,
         codigoDuplicado: false,
         productoExistenteNombre: '',
+        costo: costoInicial !== '' && costoInicial !== undefined ? Number(costoInicial) : 0,
+        porcentaje: 40,
+        precio: precioInicial !== '' && precioInicial !== undefined ? Number(precioInicial) : '',
+
+        calcularPrecio() {
+            const c = Number(this.costo) || 0;
+            const p = Number(this.porcentaje) || 0;
+            if (c > 0) {
+                this.precio = Math.round(c * (1 + p / 100) * 100) / 100;
+            } else {
+                this.precio = 0;
+            }
+        },
+
         async verificarCodigo() {
             if (!this.codigo.trim()) {
                 this.codigoDuplicado = false;
